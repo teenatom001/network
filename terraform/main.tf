@@ -18,11 +18,16 @@ resource "aws_key_pair" "deploy_key" {
   public_key = file("${path.module}/keys/sample-key.pub") # make sure this file exists
 }
 
+# Use default VPC dynamically
+data "aws_vpc" "default" {
+  default = true
+}
+
 # Security group allowing SSH and HTTP
 resource "aws_security_group" "web_sg" {
   name        = "sample-web-sg"
   description = "Allow SSH and HTTP"
-  vpc_id      = "vpc-039971930f15255f9" # replace with your actual VPC ID
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 22
