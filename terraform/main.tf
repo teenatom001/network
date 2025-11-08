@@ -26,8 +26,9 @@ data "aws_vpc" "default" {
 
 # Security group to allow SSH and HTTP
 resource "aws_security_group" "web_sg" {
-  name        = "sample-web-sg"
+  name        = "sample-web-sg-new"   # <--- change here
   description = "Allow SSH and HTTP"
+
   vpc_id      = data.aws_vpc.default.id
 
   ingress {

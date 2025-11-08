@@ -1,11 +1,20 @@
-# Use Nginx as the base image
-FROM nginx:alpine
+# Base image
+FROM node:20
 
-# Copy *everything* in the current folder into Nginx's default web root
-COPY . /usr/share/nginx/html
+# Set working directory inside container
+WORKDIR /app
 
-# Expose port 80 for HTTP traffic
-EXPOSE 80
+# Copy package.json and package-lock.json
+COPY package*.json ./
 
-# Start Nginx in the foreground
-CMD ["nginx", "-g", "daemon off;"]
+# Install dependencies
+RUN npm install
+
+# Copy all application code
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]
