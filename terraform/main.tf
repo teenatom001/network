@@ -13,22 +13,22 @@ provider "aws" {
   region = "eu-north-1"
 }
 
-# SSH key (stored inside terraform/keys)
+# --- SSH Key Pair ---
 resource "aws_key_pair" "deploy_key" {
   key_name   = "sample-key"
   public_key = file("${path.module}/keys/sample-key.pub")
 }
 
-# Default VPC
+# --- Use Default VPC ---
 data "aws_vpc" "default" {
   default = true
 }
 
-# Security group for SSH (22) and HTTP (80)
+# --- Security Group ---
 resource "aws_security_group" "web_sg" {
   name        = "sample-web-sg-1"
   description = "Allow SSH and HTTP"
-  vpc_id      = data.aws_vpc.default.id  # dynamic default VPC
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 22
@@ -52,9 +52,9 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# EC2 instance with Ubuntu 24.04 LTS
+# --- EC2 Instance ---
 resource "aws_instance" "web" {
-  ami                    = "ami‑REPLACE_WITH_UBUNTU_24_04_ID"  # Replace with verified Ubuntu 24.04 LTS AMI in eu-north-1
+  ami                    = "ami-0b751bf99d3fe2510" # ✅ Ubuntu Server 24.04 LTS (eu-north-1)
   instance_type          = "t3.micro"
   key_name               = aws_key_pair.deploy_key.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
@@ -63,10 +63,10 @@ resource "aws_instance" "web" {
     Name = "sample-ec2"
   }
 
-  # Provisioner to create user "hanubunu" and copy SSH key
+  # --- Create user "hanubunu" after instance is up ---
   provisioner "remote-exec" {
     inline = [
-      "sudo adduser hanubunu",
+      "sudo adduser --disabled-password --gecos '' hanubunu",
       "sudo mkdir -p /home/hanubunu/.ssh",
       "sudo cp /home/ubuntu/.ssh/authorized_keys /home/hanubunu/.ssh/",
       "sudo chown -R hanubunu:hanubunu /home/hanubunu/.ssh",
@@ -76,14 +76,14 @@ resource "aws_instance" "web" {
 
     connection {
       type        = "ssh"
-      user        = "ubuntu"        # Default for Ubuntu
+      user        = "ubuntu"
       private_key = file("${path.module}/keys/sample-key")
       host        = self.public_ip
     }
   }
 }
 
-# Output public IP
+# --- Output ---
 output "public_ip" {
   value = aws_instance.web.public_ip
 }
