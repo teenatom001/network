@@ -5,6 +5,7 @@ terraform {
       version = "~> 5.0"
     }
   }
+
   required_version = ">= 1.4.0"
 }
 
@@ -12,22 +13,22 @@ provider "aws" {
   region = "eu-north-1"
 }
 
-# SSH key pair
+# SSH key (stored inside terraform/keys)
 resource "aws_key_pair" "deploy_key" {
   key_name   = "sample-key"
-  public_key = file("${path.module}/keys/sample-key.pub") # make sure this file exists
+  public_key = file("${path.module}/keys/sample-key.pub")
 }
 
-# Use default VPC dynamically
+# Default VPC
 data "aws_vpc" "default" {
   default = true
 }
 
-# Security group allowing SSH and HTTP
+# Security group for SSH (22) and HTTP (80)
 resource "aws_security_group" "web_sg" {
-  name        = "sample-web-sg"
+  name        = "sample-web-sg-1"
   description = "Allow SSH and HTTP"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = data.aws_vpc.default.id  # dynamic default VPC
 
   ingress {
     from_port   = 22
@@ -51,20 +52,9 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# Fetch latest Ubuntu 22.04 LTS AMI dynamically
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-}
-
-# EC2 instance
+# EC2 instance with Ubuntu 24.04 LTS
 resource "aws_instance" "web" {
-  ami                    = data.aws_ami.ubuntu.id
+  ami                    = "ami‑REPLACE_WITH_UBUNTU_24_04_ID"  # Replace with verified Ubuntu 24.04 LTS AMI in eu-north-1
   instance_type          = "t3.micro"
   key_name               = aws_key_pair.deploy_key.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
@@ -72,9 +62,28 @@ resource "aws_instance" "web" {
   tags = {
     Name = "sample-ec2"
   }
+
+  # Provisioner to create user "hanubunu" and copy SSH key
+  provisioner "remote-exec" {
+    inline = [
+      "sudo adduser hanubunu",
+      "sudo mkdir -p /home/hanubunu/.ssh",
+      "sudo cp /home/ubuntu/.ssh/authorized_keys /home/hanubunu/.ssh/",
+      "sudo chown -R hanubunu:hanubunu /home/hanubunu/.ssh",
+      "sudo chmod 700 /home/hanubunu/.ssh",
+      "sudo chmod 600 /home/hanubunu/.ssh/authorized_keys"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"        # Default for Ubuntu
+      private_key = file("${path.module}/keys/sample-key")
+      host        = self.public_ip
+    }
+  }
 }
 
-# Output the public IP
+# Output public IP
 output "public_ip" {
   value = aws_instance.web.public_ip
 }
