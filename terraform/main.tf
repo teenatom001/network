@@ -13,20 +13,20 @@ provider "aws" {
   region = "eu-north-1"
 }
 
-# --- SSH Key Pair ---
+# Upload your local SSH public key to AWS
 resource "aws_key_pair" "deploy_key" {
   key_name   = "sample-key"
   public_key = file("${path.module}/keys/sample-key.pub")
 }
 
-# --- Use Default VPC ---
+# Use the default VPC automatically
 data "aws_vpc" "default" {
   default = true
 }
 
-# --- Security Group ---
+# Security group to allow SSH and HTTP
 resource "aws_security_group" "web_sg" {
-  name        = "sample-web-sg-1"
+  name        = "sample-web-sg"
   description = "Allow SSH and HTTP"
   vpc_id      = data.aws_vpc.default.id
 
@@ -52,38 +52,30 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# --- EC2 Instance ---
+# Get latest Ubuntu 24.04 LTS AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+}
+
+# Create the EC2 instance
 resource "aws_instance" "web" {
-  ami                    = "ami-0b751bf99d3fe2510" # ✅ Ubuntu Server 24.04 LTS (eu-north-1)
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
   key_name               = aws_key_pair.deploy_key.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
   tags = {
-    Name = "sample-ec2"
-  }
-
-  # --- Create user "hanubunu" after instance is up ---
-  provisioner "remote-exec" {
-    inline = [
-      "sudo adduser --disabled-password --gecos '' hanubunu",
-      "sudo mkdir -p /home/hanubunu/.ssh",
-      "sudo cp /home/ubuntu/.ssh/authorized_keys /home/hanubunu/.ssh/",
-      "sudo chown -R hanubunu:hanubunu /home/hanubunu/.ssh",
-      "sudo chmod 700 /home/hanubunu/.ssh",
-      "sudo chmod 600 /home/hanubunu/.ssh/authorized_keys"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      private_key = file("${path.module}/keys/sample-key")
-      host        = self.public_ip
-    }
+    Name = "terraform-sample-ec2"
   }
 }
 
-# --- Output ---
+# Output public IP
 output "public_ip" {
   value = aws_instance.web.public_ip
 }
