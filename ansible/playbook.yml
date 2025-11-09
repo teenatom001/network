@@ -1,6 +1,7 @@
-- hosts: web
+- hosts: webserver
   become: true
   tasks:
+ 
     - name: Update apt cache
       apt:
         update_cache: yes
