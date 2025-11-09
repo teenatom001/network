@@ -41,21 +41,23 @@
         update_cache: yes
 
     - name: Copy web app files to server
-      copy:
+      synchronize:
         src: ../web/
         dest: /home/ubuntu/web
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
+        recursive: yes
+      delegate_to: localhost
 
     - name: Build Docker image
       command: docker build -t dashboard-app /home/ubuntu/web
+      become: yes
       args:
         chdir: /home/ubuntu/web
         creates: /home/ubuntu/web/Dockerfile
 
     - name: Stop existing container if running
       shell: docker rm -f dashboard-app || true
+      become: yes
 
     - name: Run Docker container
       command: docker run -d -p 80:80 --name dashboard-app dashboard-app
+      become: yes
