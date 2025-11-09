@@ -50,7 +50,7 @@
     - name: Copy web folder to EC2
       copy:
         src: ../web/
-        dest: /home/ubuntu/web/
+        dest: /home/ubuntu/app/
         owner: ubuntu
         group: ubuntu
         mode: '0755'
