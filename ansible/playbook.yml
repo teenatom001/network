@@ -1,33 +1,35 @@
 ---
 - name: Setup Docker and deploy container
-  hosts: all
+  hosts: webserver
   become: yes
-  tasks:
 
+  tasks:
     - name: Install required system packages
       apt:
         name:
           - apt-transport-https
           - ca-certificates
           - curl
-          - software-properties-common
-          - python3
-          - python3-pip
+          - gnupg
         state: present
         update_cache: yes
 
     - name: Add Docker GPG key
-      ansible.builtin.shell: |
+      shell: |
         install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+        gpg --dearmor -o /etc/apt/keyrings/docker.gpg
         chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
 
     - name: Add Docker repository
-      ansible.builtin.shell: |
-        echo \
-          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-          $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
-          tee /etc/apt/sources.list.d/docker.list > /dev/null
+      copy:
+        dest: /etc/apt/sources.list.d/docker.list
+        content: |
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
 
     - name: Install Docker engine
       apt:
@@ -35,21 +37,25 @@
           - docker-ce
           - docker-ce-cli
           - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
         state: present
         update_cache: yes
 
     - name: Copy web app files to server
       copy:
-        src: ../app/
-        dest: /home/ubuntu/app/
+        src: ../web/
+        dest: /home/ubuntu/web
         owner: ubuntu
         group: ubuntu
         mode: '0755'
 
     - name: Build Docker image
-      ansible.builtin.shell: docker build -t teena001/webpage:1.0 /home/ubuntu/app
+      command: docker build -t dashboard-app /home/ubuntu/web
+      args:
+        chdir: /home/ubuntu/web
+        creates: /home/ubuntu/web/Dockerfile
+
+    - name: Stop existing container if running
+      shell: docker rm -f dashboard-app || true
 
     - name: Run Docker container
-      ansible.builtin.shell: docker run -d -p 80:80 teena001/webpage:1.0
+      command: docker run -d -p 80:80 --name dashboard-app dashboard-app
